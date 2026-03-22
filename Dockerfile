@@ -33,6 +33,8 @@ RUN pnpm i express@4
 # Finalize
 FROM base
 
+ENV PORT=8080
+
 COPY http_server.js /var/www/stremio-web
 COPY --from=server /var/www/stremio-web/node_modules /var/www/stremio-web/node_modules
 COPY --from=app /var/www/stremio-web/build /var/www/stremio-web/build
