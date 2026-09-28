@@ -1,25 +1,49 @@
 // Copyright (C) 2017-2023 Smart code 203358507
 
 const React = require('react');
+const { useParams, useLocation, useNavigate } = require('react-router');
 const { useTranslation } = require('react-i18next');
-const PropTypes = require('prop-types');
 const classnames = require('classnames');
-const { useServices } = require('stremio/services');
-const { withCoreSuspender } = require('stremio/common');
-const { VerticalNavBar, HorizontalNavBar, DelayedRenderer, Image, MetaPreview, ModalDialog } = require('stremio/components');
+const { useCore } = require('stremio/core');
+const { useContentGamepadNavigation } = require('stremio/services/GamepadNavigation');
+const { withCoreSuspender, useProfile } = require('stremio/common');
+const { useNavigateWithOrigin } = require('stremio-router');
+const { HorizontalNavBar, DelayedRenderer, Image, MetaPreview } = require('stremio/components');
 const StreamsList = require('./StreamsList');
 const VideosList = require('./VideosList');
+const { default: LiveTvDetails } = require('./LiveTvDetails');
+const { default: LiveTvPlaceholder } = require('./LiveTvDetails/Placeholder');
 const useMetaDetails = require('./useMetaDetails');
 const useSeason = require('./useSeason');
-const useMetaExtensionTabs = require('./useMetaExtensionTabs');
+const { default: useExternalPlayerCallback } = require('./useExternalPlayerCallback');
 const styles = require('./styles');
 
-const MetaDetails = ({ urlParams, queryParams }) => {
+const GAMEPAD_HANDLER_ID = 'metadetails';
+
+const MetaDetails = () => {
+    const { type, id, videoId } = useParams();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { getStoredOrigin } = useNavigateWithOrigin();
+    const contentRef = React.useRef(null);
+    const videosScrollMemoryRef = React.useRef(null);
     const { t } = useTranslation();
-    const { core } = useServices();
+    const core = useCore();
+    const profile = useProfile();
+    const urlParams = React.useMemo(() => ({
+        type,
+        id,
+        videoId
+    }), [type, id, videoId]);
     const metaDetails = useMetaDetails(urlParams);
-    const [season, setSeason] = useSeason(urlParams, queryParams);
-    const [tabs, metaExtension, clearMetaExtension] = useMetaExtensionTabs(metaDetails.metaExtensions);
+    const readyMeta = metaDetails.metaItem?.content.type === 'Ready' ? metaDetails.metaItem.content.content : null;
+    const metaAddonUrl = metaDetails.metaItem?.addon.transportUrl;
+    const isEpgProvider = React.useMemo(() => {
+        return profile.addons.some((addon) => addon.transportUrl === metaAddonUrl && addon.manifest.behaviorHints?.epgProvider === true);
+    }, [profile.addons, metaAddonUrl]);
+    const isLiveMeta = isEpgProvider && readyMeta !== null && (readyMeta.behaviorHints?.isLive === true || readyMeta.type === 'tv');
+    useExternalPlayerCallback(urlParams, metaDetails);
+    const [season, setSeason] = useSeason(urlParams);
     const [metaPath, streamPath] = React.useMemo(() => {
         return metaDetails.selected !== null ?
             [metaDetails.selected.metaPath, metaDetails.selected.streamPath]
@@ -38,6 +62,11 @@ const MetaDetails = ({ urlParams, queryParams }) => {
             :
             null;
     }, [metaDetails.metaItem, streamPath]);
+    const externalPlayerCallbackCanMarkWatched = React.useMemo(() => {
+        return typeof video?.id === 'string' &&
+            metaDetails.libraryItem?.state?.video_id === video.id &&
+            metaDetails.libraryItem?.state?.duration > 0;
+    }, [metaDetails.libraryItem, video]);
     const addToLibrary = React.useCallback(() => {
         if (metaDetails.metaItem === null || metaDetails.metaItem.content.type !== 'Ready') {
             return;
@@ -64,6 +93,19 @@ const MetaDetails = ({ urlParams, queryParams }) => {
             }
         });
     }, [metaDetails]);
+    const toggleWatched = React.useCallback(() => {
+        if (metaDetails.metaItem === null || metaDetails.metaItem.content.type !== 'Ready') {
+            return;
+        }
+
+        core.transport.dispatch({
+            action: 'MetaDetails',
+            args: {
+                action: 'MarkAsWatched',
+                args: !metaDetails.metaItem.content.content.watched
+            }
+        });
+    }, [metaDetails]);
     const toggleNotifications = React.useCallback(() => {
         if (metaDetails.libraryItem) {
             core.transport.dispatch({
@@ -80,15 +122,12 @@ const MetaDetails = ({ urlParams, queryParams }) => {
     }, [setSeason]);
     const handleEpisodeSearch = React.useCallback((season, episode) => {
         const searchVideoHash = encodeURIComponent(`${urlParams.id}:${season}:${episode}`);
-        const url = window.location.hash;
-
+        const url = location.pathname;
         const searchVideoPath = (urlParams.videoId === undefined || urlParams.videoId === null || urlParams.videoId === '') ?
             url + (!url.endsWith('/') ? '/' : '') + searchVideoHash
             : url.replace(encodeURIComponent(urlParams.videoId), searchVideoHash);
-
-        window.location = searchVideoPath;
-    }, [urlParams, window.location]);
-
+        navigate(searchVideoPath, { replace: true });
+    }, [urlParams, location]);
     const renderBackgroundImageFallback = React.useCallback(() => null, []);
     const renderBackground = React.useMemo(() => !!(
         metaPath &&
@@ -97,7 +136,43 @@ const MetaDetails = ({ urlParams, queryParams }) => {
         typeof metaDetails.metaItem.content.content?.background === 'string' &&
         metaDetails.metaItem.content.content.background.length > 0
     ), [metaPath, metaDetails]);
-
+    const originPath = React.useMemo(() => getStoredOrigin(), [getStoredOrigin]);
+    useContentGamepadNavigation(contentRef, GAMEPAD_HANDLER_ID);
+    if (type === 'tv' && (metaDetails.selected === null || (isEpgProvider && metaDetails.metaItem?.content.type === 'Loading'))) {
+        return (
+            <div className={styles['metadetails-container']}>
+                <HorizontalNavBar
+                    className={styles['nav-bar']}
+                    backButton={true}
+                    fullscreenButton={true}
+                    navMenu={true}
+                    originPath={originPath}
+                />
+                <LiveTvPlaceholder />
+            </div>
+        );
+    }
+    if (isLiveMeta) {
+        return (
+            <LiveTvDetails
+                key={readyMeta.id}
+                className={styles['metadetails-container']}
+                contentRef={contentRef}
+                meta={readyMeta}
+                addonName={metaDetails.metaItem.addon.manifest.name}
+                streams={metaDetails.streams}
+                onToggleLibrary={readyMeta.inLibrary ? removeFromLibrary : addToLibrary}
+            >
+                <HorizontalNavBar
+                    className={styles['nav-bar']}
+                    backButton={true}
+                    fullscreenButton={true}
+                    navMenu={true}
+                    originPath={originPath}
+                />
+            </LiveTvDetails>
+        );
+    }
     return (
         <div className={styles['metadetails-container']}>
             {
@@ -118,18 +193,9 @@ const MetaDetails = ({ urlParams, queryParams }) => {
                 backButton={true}
                 fullscreenButton={true}
                 navMenu={true}
+                originPath={originPath}
             />
-            <div className={styles['metadetails-content']}>
-                {
-                    tabs.length > 0 ?
-                        <VerticalNavBar
-                            className={styles['vertical-nav-bar']}
-                            tabs={tabs}
-                            selected={metaExtension !== null ? metaExtension.url : null}
-                        />
-                        :
-                        null
-                }
+            <div ref={contentRef} className={styles['metadetails-content']}>
                 {
                     metaPath === null ?
                         <DelayedRenderer delay={500}>
@@ -172,6 +238,8 @@ const MetaDetails = ({ urlParams, queryParams }) => {
                                             trailerStreams={metaDetails.metaItem.content.content.trailerStreams}
                                             inLibrary={metaDetails.metaItem.content.content.inLibrary}
                                             toggleInLibrary={metaDetails.metaItem.content.content.inLibrary ? removeFromLibrary : addToLibrary}
+                                            watched={metaDetails.metaItem.content.content.watched}
+                                            toggleWatched={toggleWatched}
                                             metaId={metaDetails.metaItem.content.content.id}
                                             ratingInfo={metaDetails.ratingInfo}
                                         />
@@ -185,6 +253,7 @@ const MetaDetails = ({ urlParams, queryParams }) => {
                             streams={metaDetails.streams}
                             video={video}
                             type={streamPath.type}
+                            externalPlayerCallbackCanMarkWatched={externalPlayerCallbackCanMarkWatched}
                             onEpisodeSearch={handleEpisodeSearch}
                         />
                         :
@@ -197,48 +266,30 @@ const MetaDetails = ({ urlParams, queryParams }) => {
                                 selectedVideoId={metaDetails.libraryItem?.state?.video_id}
                                 seasonOnSelect={seasonOnSelect}
                                 toggleNotifications={toggleNotifications}
+                                scrollMemoryRef={videosScrollMemoryRef}
+                                titleKey={JSON.stringify([metaPath.type, metaPath.id])}
                             />
                             :
                             null
                 }
             </div>
-            {
-                metaExtension !== null ?
-                    <ModalDialog
-                        className={styles['meta-extension-modal-container']}
-                        title={metaExtension.name}
-                        onCloseRequest={clearMetaExtension}>
-                        <iframe
-                            className={styles['meta-extension-modal-iframe']}
-                            sandbox={'allow-forms allow-scripts allow-same-origin'}
-                            src={metaExtension.url}
-                        />
-                    </ModalDialog>
-                    :
-                    null
-            }
         </div>
     );
 };
 
-MetaDetails.propTypes = {
-    urlParams: PropTypes.shape({
-        type: PropTypes.string,
-        id: PropTypes.string,
-        videoId: PropTypes.string
-    }),
-    queryParams: PropTypes.instanceOf(URLSearchParams)
+const MetaDetailsFallback = () => {
+    const { type } = useParams();
+    return (
+        <div className={styles['metadetails-container']}>
+            <HorizontalNavBar
+                className={styles['nav-bar']}
+                backButton={true}
+                fullscreenButton={true}
+                navMenu={true}
+            />
+            {type === 'tv' && <LiveTvPlaceholder />}
+        </div>
+    );
 };
-
-const MetaDetailsFallback = () => (
-    <div className={styles['metadetails-container']}>
-        <HorizontalNavBar
-            className={styles['nav-bar']}
-            backButton={true}
-            fullscreenButton={true}
-            navMenu={true}
-        />
-    </div>
-);
 
 module.exports = withCoreSuspender(MetaDetails, MetaDetailsFallback);

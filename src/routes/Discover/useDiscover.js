@@ -2,7 +2,7 @@
 
 const React = require('react');
 const UrlUtils = require('url');
-const { useServices } = require('stremio/services');
+const { useCore } = require('stremio/core');
 const { useModelState } = require('stremio/common');
 
 const map = (discover) => ({
@@ -23,7 +23,7 @@ const map = (discover) => ({
 });
 
 const useDiscover = (urlParams, queryParams) => {
-    const { core } = useServices();
+    const core = useCore();
     const loadNextPage = React.useCallback(() => {
         core.transport.dispatch({
             action: 'CatalogWithFilters',
@@ -39,7 +39,7 @@ const useDiscover = (urlParams, queryParams) => {
                 return {
                     action: 'Load',
                     args: {
-                        model: 'CatalogWithFilters',
+                        model: 'CatalogWithFiltersSelection',
                         args: {
                             request: {
                                 base: urlParams.transportUrl,
@@ -58,7 +58,7 @@ const useDiscover = (urlParams, queryParams) => {
             return {
                 action: 'Load',
                 args: {
-                    model: 'CatalogWithFilters',
+                    model: 'CatalogWithFiltersSelection',
                     args: null
                 }
             };

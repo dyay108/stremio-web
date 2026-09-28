@@ -2,32 +2,66 @@
 
 const React = require('react');
 const { useTranslation } = require('react-i18next');
+const { useNavigate } = require('react-router');
+const { default: toPath } = require('stremio-router/toPath');
 const PropTypes = require('prop-types');
 const classnames = require('classnames');
-const { useRouteFocused } = require('stremio-router');
+const { default: useRouteFocused } = require('stremio/common/useRouteFocused');
 const { default: Icon } = require('@stremio/stremio-icons/react');
 const { Button, Image, Popup } = require('stremio/components');
 const useBinaryState = require('stremio/common/useBinaryState');
 const useProfile = require('stremio/common/useProfile');
+const { usePlatform } = require('stremio/common/Platform');
+const { formatEpgTimeRange } = require('stremio/common/EPG');
+const { getInterfaceRect } = require('stremio/common/interfaceScale');
 const VideoPlaceholder = require('./VideoPlaceholder');
 const styles = require('./styles');
 
-const Video = ({ className, id, title, thumbnail, season, episode, released, upcoming, watched, progress, scheduled, seasonWatched, selected, deepLinks, onMarkVideoAsWatched, onMarkSeasonAsWatched, ...props }) => {
+const VideoLabel = React.forwardRef(({ shouldScroll, ...props }, ref) => {
+    React.useEffect(() => {
+        if (shouldScroll && ref.current) {
+            // Keep selection scrolling inside the list. scrollIntoView also
+            // scrolls outer containers while a drawer is translated offscreen.
+            let container = ref.current.parentElement;
+            while (container && !['auto', 'scroll', 'overlay'].includes(getComputedStyle(container).overflowY)) {
+                container = container.parentElement;
+            }
+            if (container) {
+                const itemBounds = getInterfaceRect(ref.current);
+                const listBounds = getInterfaceRect(container);
+                const top = itemBounds.top < listBounds.top ? itemBounds.top - listBounds.top
+                    : Math.max(0, itemBounds.bottom - listBounds.bottom);
+                if (top !== 0) container.scrollBy({ top, behavior: 'smooth' });
+            }
+        }
+    }, [shouldScroll, ref]);
+
+    return <Button {...props} ref={ref} />;
+});
+
+VideoLabel.propTypes = {
+    shouldScroll: PropTypes.bool,
+};
+
+const Video = ({ className, id, title, thumbnail, season, episode, released, upcoming, watched, progress, scheduled, seasonWatched, selected, deepLinks, isEpg, isNow, startTime, endTime, onSelect, onMarkVideoAsWatched, onMarkSeasonAsWatched, ...props }) => {
     const routeFocused = useRouteFocused();
     const profile = useProfile();
+    const navigate = useNavigate();
+    const platform = usePlatform();
     const { t } = useTranslation();
-    const [menuOpen, , closeMenu, toggleMenu] = useBinaryState(false);
+
+    const [menuOpen, openMenu, closeMenu, toggleMenu] = useBinaryState(false);
 
     const popupLabelOnMouseUp = React.useCallback((event) => {
         if (!event.nativeEvent.togglePopupPrevented) {
             if (event.nativeEvent.ctrlKey || event.nativeEvent.button === 2) {
                 event.preventDefault();
-                toggleMenu();
+                openMenu();
             }
         }
-    }, []);
+    }, [openMenu]);
     const popupLabelOnContextMenu = React.useCallback((event) => {
-        if (!event.nativeEvent.togglePopupPrevented && !event.nativeEvent.ctrlKey) {
+        if (!event.nativeEvent.togglePopupPrevented && !event.nativeEvent.ctrlKey && !event.nativeEvent.shiftKey) {
             event.preventDefault();
         }
     }, [toggleMenu]);
@@ -41,6 +75,9 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
     }, []);
     const popupMenuOnContextMenu = React.useCallback((event) => {
         event.nativeEvent.togglePopupPrevented = true;
+        if (!event.nativeEvent.ctrlKey && !event.nativeEvent.shiftKey) {
+            event.preventDefault();
+        }
     }, []);
     const popupMenuOnClick = React.useCallback((event) => {
         event.nativeEvent.togglePopupPrevented = true;
@@ -60,32 +97,38 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
         closeMenu();
         onMarkSeasonAsWatched(season, seasonWatched);
     }, [season, seasonWatched, onMarkSeasonAsWatched]);
-    const videoButtonOnClick = React.useCallback(() => {
-        if (deepLinks) {
-            if (typeof deepLinks.player === 'string') {
-                window.location = deepLinks.player;
-            } else if (typeof deepLinks.metaDetailsStreams === 'string') {
-                window.location.replace(deepLinks.metaDetailsStreams);
-            }
+    const selectVideo = React.useCallback(() => {
+        if (typeof onSelect === 'function') {
+            onSelect();
         }
-    }, [deepLinks]);
+    }, [onSelect]);
+    const videoButtonOnClick = React.useCallback(() => {
+        selectVideo();
+
+        if (deepLinks && typeof deepLinks.metaDetailsStreams === 'string') {
+            navigate(toPath(deepLinks.metaDetailsStreams), { replace: !platform.isMobile });
+        }
+    }, [deepLinks, navigate, platform.isMobile, selectVideo]);
+    const playButtonOnClick = React.useCallback((event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectVideo();
+        if (deepLinks && typeof deepLinks.player === 'string') {
+            navigate(toPath(deepLinks.player));
+        }
+    }, [deepLinks, navigate, selectVideo]);
+    const playButtonOnKeyDown = React.useCallback((event) => {
+        event.stopPropagation();
+    }, []);
     const renderLabel = React.useMemo(() => function renderLabel({ className, id, title, thumbnail, episode, released, upcoming, watched, progress, scheduled, children, ref, ...props }) {
         const blurThumbnail = profile.settings.hideSpoilers && season && episode && !watched;
-
-        React.useEffect(() => {
-            if (selected && ref.current) {
-                if ((progress && watched) || !watched) {
-                    ref.current.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'nearest',
-                        inline: 'start'
-                    });
-                }
-            }
-        }, [selected]);
+        const epgTimeRange = isEpg ?
+            formatEpgTimeRange(startTime, endTime, profile.settings.interfaceLanguage)
+            :
+            null;
 
         return (
-            <Button {...props} ref={ref} className={classnames(className, styles['video-container'], { [styles['selected']]: selected })} title={title}>
+            <VideoLabel {...props} ref={ref} shouldScroll={selected && (!watched || !!progress)} className={classnames(className, styles['video-container'], { [styles['selected']]: selected, 'active': menuOpen })} title={title}>
                 {
                     typeof thumbnail === 'string' && thumbnail.length > 0 ?
                         <div className={styles['thumbnail-container']}>
@@ -120,21 +163,26 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
                     </div>
                     <div className={styles['flex-row-container']}>
                         {
-                            released instanceof Date && !isNaN(released.getTime()) ?
+                            epgTimeRange !== null ?
                                 <div className={styles['released-container']}>
-                                    {released.toLocaleString(profile.settings.interfaceLanguage, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                    {epgTimeRange}
                                 </div>
                                 :
-                                scheduled ?
-                                    <div className={styles['released-container']} title={t('TBA')}>
-                                        {t('TBA')}
+                                released instanceof Date && !isNaN(released.getTime()) ?
+                                    <div className={styles['released-container']}>
+                                        {released.toLocaleString(profile.settings.interfaceLanguage, { year: 'numeric', month: 'short', day: 'numeric' })}
                                     </div>
                                     :
-                                    null
+                                    scheduled ?
+                                        <div className={styles['released-container']} title={t('TBA')}>
+                                            {t('TBA')}
+                                        </div>
+                                        :
+                                        null
                         }
                         <div className={styles['upcoming-watched-container']}>
                             {
-                                upcoming && !watched ?
+                                upcoming && !watched && !isNow ?
                                     <div className={styles['upcoming-container']}>
                                         <div className={styles['flag-label']}>{t('UPCOMING')}</div>
                                     </div>
@@ -142,7 +190,17 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
                                     null
                             }
                             {
-                                watched ?
+                                isNow ?
+                                    <div className={styles['live-container']}>
+                                        <div className={styles['flag-label']}>
+                                            {t('PLAYER_LIVE', { defaultValue: 'Live' })}
+                                        </div>
+                                    </div>
+                                    :
+                                    null
+                            }
+                            {
+                                watched && !isNow ?
                                     <div className={styles['watched-container']}>
                                         <Icon className={styles['flag-icon']} name={'eye'} />
                                         <div className={styles['flag-label']}>{t('CTX_WATCHED')}</div>
@@ -153,10 +211,23 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
                         </div>
                     </div>
                 </div>
+                {
+                    deepLinks && typeof deepLinks.player === 'string' ?
+                        <Button
+                            className={styles['play-button-container']}
+                            title={t('CTX_WATCH')}
+                            onClick={playButtonOnClick}
+                            onKeyDown={playButtonOnKeyDown}
+                        >
+                            <Icon className={styles['play-icon']} name={'play'} />
+                        </Button>
+                        :
+                        null
+                }
                 {children}
-            </Button>
+            </VideoLabel>
         );
-    }, [selected]);
+    }, [deepLinks, playButtonOnClick, playButtonOnKeyDown, selected, menuOpen, endTime, isEpg, isNow, profile.settings.hideSpoilers, profile.settings.interfaceLanguage, season, startTime, t]);
     const renderMenu = React.useMemo(() => function renderMenu() {
         return (
             <div className={styles['context-menu-content']} onPointerDown={popupMenuOnPointerDown} onContextMenu={popupMenuOnContextMenu} onClick={popupMenuOnClick} onKeyDown={popupMenuOnKeyDown}>
@@ -189,6 +260,10 @@ const Video = ({ className, id, title, thumbnail, season, episode, released, upc
             watched={watched}
             progress={progress}
             scheduled={scheduled}
+            isEpg={isEpg}
+            isNow={isNow}
+            startTime={startTime}
+            endTime={endTime}
             onClick={videoButtonOnClick}
             {...props}
             onMouseUp={popupLabelOnMouseUp}
@@ -216,12 +291,23 @@ Video.propTypes = {
     watched: PropTypes.bool,
     progress: PropTypes.number,
     scheduled: PropTypes.bool,
+    isEpg: PropTypes.bool,
+    isNow: PropTypes.bool,
+    startTime: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.instanceOf(Date)
+    ]),
+    endTime: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.instanceOf(Date)
+    ]),
     seasonWatched: PropTypes.bool,
     selected: PropTypes.bool,
     deepLinks: PropTypes.shape({
         metaDetailsStreams: PropTypes.string,
         player: PropTypes.string
     }),
+    onSelect: PropTypes.func,
     onMarkVideoAsWatched: PropTypes.func,
     onMarkSeasonAsWatched: PropTypes.func,
 };

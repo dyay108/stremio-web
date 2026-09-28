@@ -1,7 +1,7 @@
 // Copyright (C) 2017-2023 Smart code 203358507
 
 const React = require('react');
-const { useServices } = require('stremio/services');
+const { useCore } = require('stremio/core');
 const { useModelState, useCoreSuspender } = require('stremio/common');
 
 const map = (player) => ({
@@ -33,7 +33,7 @@ const map = (player) => ({
 });
 
 const usePlayer = (urlParams) => {
-    const { core } = useServices();
+    const core = useCore();
     const { decodeStream } = useCoreSuspender();
     const stream = decodeStream(urlParams.stream);
     const action = React.useMemo(() => {
@@ -99,14 +99,16 @@ const usePlayer = (urlParams) => {
         }, 'player');
     }, []);
     const timeChanged = React.useCallback((time, duration, device) => {
-        if (typeof time === 'number' && typeof duration === 'number' && typeof device === 'string') {
+        // live streams have no duration - report 0 instead of skipping the
+        // action, otherwise the library item is never updated while watching
+        if (typeof time === 'number' && typeof device === 'string') {
             core.transport.dispatch({
                 action: 'Player',
                 args: {
                     action: 'TimeChanged',
                     args: {
                         time: Math.max(0, Math.round(time)),
-                        duration: Math.max(0, Math.round(duration)),
+                        duration: typeof duration === 'number' ? Math.max(0, Math.round(duration)) : 0,
                         device,
                     }
                 }
@@ -171,7 +173,37 @@ const usePlayer = (urlParams) => {
         }, 'player');
     }, [player.streamState]);
 
-    return [player, videoParamsChanged, streamStateChanged, timeChanged, seek, pausedChanged, ended, nextVideo];
+    const audioPreferenceChanged = React.useCallback((preference) => {
+        return core.transport.dispatch({
+            action: 'Player',
+            args: {
+                action: 'AudioPreferenceChanged',
+                args: { preference },
+            },
+        }, 'player');
+    }, []);
+
+    const subtitlePreferenceChanged = React.useCallback((preference) => {
+        return core.transport.dispatch({
+            action: 'Player',
+            args: {
+                action: 'SubtitlePreferenceChanged',
+                args: { preference },
+            },
+        }, 'player');
+    }, []);
+
+    const videoScaleChanged = React.useCallback((videoScale) => {
+        return core.transport.dispatch({
+            action: 'Player',
+            args: {
+                action: 'VideoScaleChanged',
+                args: { videoScale },
+            },
+        }, 'player');
+    }, []);
+
+    return [player, videoParamsChanged, streamStateChanged, audioPreferenceChanged, subtitlePreferenceChanged, videoScaleChanged, timeChanged, seek, pausedChanged, ended, nextVideo];
 };
 
 module.exports = usePlayer;

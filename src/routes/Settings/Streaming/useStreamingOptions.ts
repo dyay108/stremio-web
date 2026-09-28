@@ -3,7 +3,8 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { deepEqual } from 'fast-equals';
-import { useServices } from 'stremio/services';
+import { useCore } from 'stremio/core';
+import useCacheLocation from './useCacheLocation';
 
 const CACHE_SIZES = [0, 2147483648, 5368709120, 10737418240, null];
 
@@ -62,8 +63,9 @@ const TORRENT_PROFILES: Record<string, TorrentProfile> = {
 };
 
 const useStreamingOptions = (streamingServer: StreamingServer) => {
-    const { core } = useServices();
+    const core = useCore();
     const { t } = useTranslation();
+    const cacheLocation = useCacheLocation(streamingServer);
     // TODO combine those useMemo in one
 
     const settings = useMemo(() => (
@@ -229,6 +231,9 @@ const useStreamingOptions = (streamingServer: StreamingServer) => {
         streamingServerRemoteUrlInput,
         remoteEndpointSelect,
         cacheSizeSelect,
+        cacheLocationSelect: cacheLocation.select,
+        cacheLocationError: cacheLocation.error,
+        settingsDisabled: cacheLocation.busy,
         torrentProfileSelect,
         transcodingProfileSelect,
     };

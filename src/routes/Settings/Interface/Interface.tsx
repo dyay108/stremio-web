@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react';
-import { useServices } from 'stremio/services';
-import { MultiselectMenu, Toggle } from 'stremio/components';
+import { usePlatform } from 'stremio/common';
+import { Scale, MultiselectMenu, Toggle } from 'stremio/components';
 import { Section, Option } from '../components';
 import useInterfaceOptions from './useInterfaceOptions';
 
@@ -9,13 +9,15 @@ type Props = {
 };
 
 const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) => {
-    const { shell } = useServices();
+    const { shell } = usePlatform();
 
     const {
         interfaceLanguageSelect,
+        interfaceSize,
         quitOnCloseToggle,
         escExitFullscreenToggle,
         hideSpoilersToggle,
+        gamepadSupportToggle,
     } = useInterfaceOptions(profile);
 
     return (
@@ -25,6 +27,9 @@ const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) =>
                     className={'multiselect'}
                     {...interfaceLanguageSelect}
                 />
+            </Option>
+            <Option label={'SETTINGS_UI_ZOOM'}>
+                <Scale {...interfaceSize} />
             </Option>
             {
                 shell.active &&
@@ -48,6 +53,12 @@ const Interface = forwardRef<HTMLDivElement, Props>(({ profile }: Props, ref) =>
                 <Toggle
                     tabIndex={-1}
                     {...hideSpoilersToggle}
+                />
+            </Option>
+            <Option label={'SETTINGS_GAMEPAD'}>
+                <Toggle
+                    tabIndex={-1}
+                    {...gamepadSupportToggle}
                 />
             </Option>
         </Section>

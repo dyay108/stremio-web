@@ -8,9 +8,12 @@ const { useTranslation } = require('react-i18next');
 const { default: Icon } = require('@stremio/stremio-icons/react');
 const { default: Button } = require('stremio/components/Button');
 const { default: Image } = require('stremio/components/Image');
+const { default: ActionsGroup } = require('stremio/components/ActionsGroup');
 const ModalDialog = require('stremio/components/ModalDialog');
 const SharePrompt = require('stremio/components/SharePrompt');
 const CONSTANTS = require('stremio/common/CONSTANTS');
+const { default: useMediaQuery } = require('stremio/common/useMediaQuery');
+const screenSizes = require('stremio/common/screen-sizes.less');
 const routesRegexp = require('stremio/common/routesRegexp');
 const useBinaryState = require('stremio/common/useBinaryState');
 const ActionButton = require('./ActionButton');
@@ -25,9 +28,11 @@ const ALLOWED_LINK_REDIRECTS = [
     routesRegexp.metadetails.regexp
 ];
 
-const MetaPreview = React.forwardRef(({ className, compact, name, logo, background, runtime, releaseInfo, released, description, deepLinks, links, trailerStreams, inLibrary, toggleInLibrary, ratingInfo }, ref) => {
+const MetaPreview = React.forwardRef(({ className, compact, name, logo, background, runtime, releaseInfo, released, description, deepLinks, links, trailerStreams, inLibrary, toggleInLibrary, watched, toggleWatched, ratingInfo, metadata, children, actions, showIcon = 'play', onShowClick }, ref) => {
     const { t } = useTranslation();
     const [shareModalOpen, openShareModal, closeShareModal] = useBinaryState(false);
+    const isMobileLandscape = useMediaQuery(`(max-width: ${screenSizes.xsmall}) and (orientation: landscape)`);
+    const iconActions = compact && isMobileLandscape;
     const linksGroups = React.useMemo(() => {
         return Array.isArray(links) ?
             links
@@ -98,6 +103,18 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
     const renderLogoFallback = React.useCallback(() => (
         <div className={styles['logo-placeholder']}>{name}</div>
     ), [name]);
+    const metaItemActions = React.useMemo(() => [
+        {
+            icon: inLibrary ? 'remove-from-library' : 'add-to-library',
+            label: inLibrary ? t('REMOVE_FROM_LIB') : t('ADD_TO_LIB'),
+            onClick: typeof toggleInLibrary === 'function' ? toggleInLibrary : null,
+        },
+        {
+            icon: watched ? 'eye-off' : 'eye',
+            label: watched ? t('CTX_MARK_UNWATCHED') : t('CTX_MARK_WATCHED'),
+            onClick: typeof toggleWatched === 'function' ? toggleWatched : undefined,
+        },
+    ], [inLibrary, watched, toggleInLibrary, toggleWatched]);
     return (
         <div className={classnames(className, styles['meta-preview-container'], { [styles['compact']]: compact })} ref={ref}>
             {
@@ -122,7 +139,7 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                         renderLogoFallback()
                 }
                 {
-                    (typeof releaseInfo === 'string' && releaseInfo.length > 0) || (released instanceof Date && !isNaN(released.getTime())) || (typeof runtime === 'string' && runtime.length > 0) || linksGroups.has(CONSTANTS.IMDB_LINK_CATEGORY) ?
+                    metadata !== undefined ? metadata : (typeof releaseInfo === 'string' && releaseInfo.length > 0) || (released instanceof Date && !isNaN(released.getTime())) || (typeof runtime === 'string' && runtime.length > 0) || linksGroups.has(CONSTANTS.IMDB_LINK_CATEGORY) ?
                         <div className={styles['runtime-release-info-container']}>
                             {
                                 typeof runtime === 'string' && runtime.length > 0 ?
@@ -146,7 +163,7 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                                         title={linksGroups.get(CONSTANTS.IMDB_LINK_CATEGORY).label}
                                         href={linksGroups.get(CONSTANTS.IMDB_LINK_CATEGORY).href}
                                         target={'_blank'}
-                                        {...(compact ? { tabIndex: -1 } : null)}
+                                        tabIndex={0}
                                     >
                                         <div className={styles['label']}>{linksGroups.get(CONSTANTS.IMDB_LINK_CATEGORY).label}</div>
                                         <Icon className={styles['icon']} name={'imdb'} />
@@ -193,81 +210,79 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
                         :
                         null
                 }
+                {children}
             </div>
             <div className={styles['action-buttons-container']}>
-                {
-                    typeof toggleInLibrary === 'function' ?
-                        <ActionButton
-                            className={styles['action-button']}
-                            icon={inLibrary ? 'remove-from-library' : 'add-to-library'}
-                            label={inLibrary ? t('REMOVE_FROM_LIB') : t('ADD_TO_LIB')}
-                            tooltip={compact}
-                            tabIndex={compact ? -1 : 0}
-                            onClick={toggleInLibrary}
-                        />
-                        :
-                        null
-                }
-                {
-                    typeof trailerHref === 'string' ?
-                        <ActionButton
-                            className={styles['action-button']}
-                            icon={'trailer'}
-                            label={t('TRAILER')}
-                            tabIndex={compact ? -1 : 0}
-                            href={trailerHref}
-                            tooltip={compact}
-                        />
-                        :
-                        null
-                }
-                {
-                    typeof showHref === 'string' && compact ?
-                        <ActionButton
-                            className={classnames(styles['action-button'], styles['show-button'])}
-                            icon={'play'}
-                            label={t('SHOW')}
-                            tabIndex={compact ? -1 : 0}
-                            href={showHref}
-                        />
-                        :
-                        null
-                }
-                {
-                    !compact && ratingInfo !== null ?
-                        <Ratings
-                            ratingInfo={ratingInfo}
-                            className={styles['ratings']}
-                        />
-                        :
-                        null
-                }
-                {
-                    linksGroups.has(CONSTANTS.SHARE_LINK_CATEGORY) && !compact ?
-                        <React.Fragment>
+                {actions !== undefined ? actions : <>
+                    {
+                        typeof trailerHref === 'string' ?
                             <ActionButton
                                 className={styles['action-button']}
-                                icon={'share'}
-                                label={t('CTX_SHARE')}
-                                tooltip={true}
-                                tabIndex={compact ? -1 : 0}
-                                onClick={openShareModal}
+                                icon={'trailer'}
+                                label={t('TRAILER')}
+                                tabIndex={0}
+                                href={trailerHref}
+                                tooltip={compact}
                             />
-                            {
-                                shareModalOpen ?
-                                    <ModalDialog title={t('CTX_SHARE')} onCloseRequest={closeShareModal}>
-                                        <SharePrompt
-                                            className={styles['share-prompt']}
-                                            url={linksGroups.get(CONSTANTS.SHARE_LINK_CATEGORY).href}
-                                        />
-                                    </ModalDialog>
-                                    :
-                                    null
-                            }
-                        </React.Fragment>
-                        :
-                        null
-                }
+                            :
+                            null
+                    }
+                    {
+                        typeof toggleInLibrary === 'function' && typeof toggleWatched === 'function'
+                            ? <ActionsGroup items={metaItemActions} className={styles['group-container']} />
+                            : null
+                    }
+                    {
+                        typeof showHref === 'string' && compact ?
+                            <ActionButton
+                                className={classnames(styles['action-button'], styles['show-button'])}
+                                icon={showIcon}
+                                label={t('SHOW')}
+                                variant={iconActions ? 'icon' : 'wide'}
+                                tooltip={iconActions}
+                                tabIndex={0}
+                                href={showHref}
+                                onClick={onShowClick}
+                            />
+                            :
+                            null
+                    }
+                    {
+                        !compact && ratingInfo !== null ?
+                            <Ratings
+                                ratingInfo={ratingInfo}
+                                className={styles['group-container']}
+                            />
+                            :
+                            null
+                    }
+                    {
+                        linksGroups.has(CONSTANTS.SHARE_LINK_CATEGORY) && !compact ?
+                            <React.Fragment>
+                                <ActionButton
+                                    className={styles['action-button']}
+                                    icon={'share'}
+                                    label={t('CTX_SHARE')}
+                                    tooltip={true}
+                                    tabIndex={0}
+                                    onClick={openShareModal}
+                                />
+                                {
+                                    shareModalOpen ?
+                                        <ModalDialog title={t('CTX_SHARE')} onCloseRequest={closeShareModal}>
+                                            <SharePrompt
+                                                className={styles['share-prompt']}
+                                                url={linksGroups.get(CONSTANTS.SHARE_LINK_CATEGORY).href}
+                                            />
+                                        </ModalDialog>
+                                        :
+                                        null
+                                }
+                            </React.Fragment>
+                            :
+                            null
+                    }
+                </>}
             </div>
         </div>
     );
@@ -276,6 +291,10 @@ const MetaPreview = React.forwardRef(({ className, compact, name, logo, backgrou
 MetaPreview.Placeholder = MetaPreviewPlaceholder;
 
 MetaPreview.propTypes = {
+    metadata: PropTypes.node,
+    children: PropTypes.node,
+    actions: PropTypes.node,
+    showIcon: PropTypes.string,
     className: PropTypes.string,
     compact: PropTypes.bool,
     name: PropTypes.string,
@@ -298,7 +317,10 @@ MetaPreview.propTypes = {
     trailerStreams: PropTypes.array,
     inLibrary: PropTypes.bool,
     toggleInLibrary: PropTypes.func,
+    watched: PropTypes.bool,
+    toggleWatched: PropTypes.func,
     ratingInfo: PropTypes.object,
+    onShowClick: PropTypes.func,
 };
 
 module.exports = MetaPreview;

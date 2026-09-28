@@ -21,6 +21,9 @@ const Streaming = forwardRef<HTMLDivElement, Props>(({ profile, streamingServer 
         streamingServerRemoteUrlInput,
         remoteEndpointSelect,
         cacheSizeSelect,
+        cacheLocationSelect,
+        cacheLocationError,
+        settingsDisabled,
         torrentProfileSelect,
         transcodingProfileSelect,
     } = useStreamingOptions(streamingServer);
@@ -39,7 +42,7 @@ const Streaming = forwardRef<HTMLDivElement, Props>(({ profile, streamingServer 
 
     return (
         <Section ref={ref} label={'SETTINGS_NAV_STREAMING'}>
-            <URLsManager />
+            <URLsManager selectedUrl={profile.settings.streamingServerUrl} settings={streamingServer.settings} />
             {
                 streamingServerRemoteUrlInput.value !== null &&
                     <Option className={styles['configure-input-container']} label={'SETTINGS_REMOTE_URL'}>
@@ -55,6 +58,7 @@ const Streaming = forwardRef<HTMLDivElement, Props>(({ profile, streamingServer 
                         <MultiselectMenu
                             className={'multiselect'}
                             {...remoteEndpointSelect}
+                            disabled={settingsDisabled}
                         />
                     </Option>
             }
@@ -64,7 +68,20 @@ const Streaming = forwardRef<HTMLDivElement, Props>(({ profile, streamingServer 
                         <MultiselectMenu
                             className={'multiselect'}
                             {...cacheSizeSelect}
+                            disabled={settingsDisabled}
                         />
+                    </Option>
+            }
+            {
+                cacheLocationSelect !== null &&
+                    <Option className={styles['cache-location-container']} label={'SETTINGS_CACHING_DRIVE'}>
+                        <div className={styles['cache-location-control']} title={cacheLocationSelect.title}>
+                            <MultiselectMenu
+                                className={'multiselect'}
+                                {...cacheLocationSelect}
+                            />
+                            {cacheLocationError && <div className={styles['cache-location-error']} role={'alert'}>{cacheLocationError}</div>}
+                        </div>
                     </Option>
             }
             {
@@ -73,6 +90,7 @@ const Streaming = forwardRef<HTMLDivElement, Props>(({ profile, streamingServer 
                         <MultiselectMenu
                             className={'multiselect'}
                             {...torrentProfileSelect}
+                            disabled={settingsDisabled}
                         />
                     </Option>
             }
@@ -82,6 +100,7 @@ const Streaming = forwardRef<HTMLDivElement, Props>(({ profile, streamingServer 
                         <MultiselectMenu
                             className={'multiselect'}
                             {...transcodingProfileSelect}
+                            disabled={settingsDisabled}
                         />
                     </Option>
             }

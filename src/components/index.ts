@@ -1,4 +1,7 @@
+// Copyright (C) 2017-2026 Smart code 203358507
+
 import AddonDetailsModal from './AddonDetailsModal';
+import ActionMenu from './ActionMenu';
 import BottomSheet from './BottomSheet';
 import Button from './Button';
 import Checkbox from './Checkbox';
@@ -6,11 +9,13 @@ import Chips from './Chips';
 import ColorInput from './ColorInput';
 import ContextMenu from './ContextMenu';
 import ContinueWatchingItem from './ContinueWatchingItem';
+import Scale from './Scale';
 import DelayedRenderer from './DelayedRenderer';
 import EventModal from './EventModal';
 import HorizontalScroll from './HorizontalScroll';
 import Image from './Image';
 import LibItem from './LibItem';
+import LiveTvContinueWatchingItem from './LiveTvContinueWatchingItem';
 import MainNavBars from './MainNavBars';
 import MetaItem from './MetaItem';
 import MetaPreview from './MetaPreview';
@@ -29,10 +34,13 @@ import ShortcutsGroup from './ShortcutsGroup';
 import TextInput from './TextInput';
 import Toggle from './Toggle';
 import Transition from './Transition';
+import UpdateBanner from './UpdateBanner';
 import Video from './Video';
+import ActionsGroup from './ActionsGroup';
 
 export {
     AddonDetailsModal,
+    ActionMenu,
     BottomSheet,
     Button,
     Checkbox,
@@ -40,11 +48,13 @@ export {
     ColorInput,
     ContextMenu,
     ContinueWatchingItem,
+    Scale,
     DelayedRenderer,
     EventModal,
     HorizontalScroll,
     Image,
     LibItem,
+    LiveTvContinueWatchingItem,
     MainNavBars,
     MetaItem,
     MetaPreview,
@@ -64,5 +74,7 @@ export {
     TextInput,
     Toggle,
     Transition,
+    UpdateBanner,
     Video,
+    ActionsGroup
 };

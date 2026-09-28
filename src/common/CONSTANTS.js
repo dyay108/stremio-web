@@ -2,15 +2,17 @@
 
 const CHROMECAST_RECEIVER_APP_ID = '1634F54B';
 const DEFAULT_STREAMING_SERVER_URL = 'http://127.0.0.1:11470/';
+const DEFAULT_SUBTITLES_LANGUAGE = 'eng';
+const LOCAL_SUBTITLES_LANGUAGE = 'local';
 const SUBTITLES_SIZES = [75, 100, 125, 150, 175, 200, 250];
 const SUBTITLES_FONTS = ['PlusJakartaSans', 'Arial', 'Halvetica', 'Times New Roman', 'Verdana', 'Courier', 'Lucida Console', 'sans-serif', 'serif', 'monospace'];
 const SEEK_TIME_DURATIONS = [3000, 5000, 10000, 15000, 20000, 30000];
 const NEXT_VIDEO_POPUP_DURATIONS = [0, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000, 75000, 80000, 85000, 90000];
+const INTERFACE_SCALES = [75, 100, 125, 150, 175];
 const CATALOG_PREVIEW_SIZE = 10;
 const CATALOG_PAGE_SIZE = 100;
 const NONE_EXTRA_VALUE = 'None';
 const SKIP_EXTRA_NAME = 'skip';
-const META_LINK_CATEGORY = 'meta';
 const IMDB_LINK_CATEGORY = 'imdb';
 const SHARE_LINK_CATEGORY = 'share';
 const WRITERS_LINK_CATEGORY = 'Writers';
@@ -44,6 +46,7 @@ const ICON_FOR_TYPE = new Map([
 const MIME_SIGNATURES = {
     'application/x-subrip': ['310D0A', '310A'],
     'text/vtt': ['574542565454'],
+    'application/x-bittorrent': ['64'],
 };
 
 const SUPPORTED_LOCAL_SUBTITLES = [
@@ -65,7 +68,7 @@ const EXTERNAL_PLAYERS = [
     {
         label: 'VLC',
         value: 'vlc',
-        platforms: ['ios', 'visionos', 'android'],
+        platforms: ['ios', 'visionos', 'android', 'windows'],
     },
     {
         label: 'MPV',
@@ -98,6 +101,11 @@ const EXTERNAL_PLAYERS = [
         platforms: ['visionos'],
     },
     {
+        label: 'CineUltra',
+        value: 'cineultra',
+        platforms: ['visionos'],
+    },
+    {
         label: 'Infuse',
         value: 'infuse',
         platforms: ['ios', 'visionos', 'macos'],
@@ -121,15 +129,17 @@ const PROTOCOL = 'stremio:';
 module.exports = {
     CHROMECAST_RECEIVER_APP_ID,
     DEFAULT_STREAMING_SERVER_URL,
+    DEFAULT_SUBTITLES_LANGUAGE,
+    LOCAL_SUBTITLES_LANGUAGE,
     SUBTITLES_SIZES,
     SUBTITLES_FONTS,
     SEEK_TIME_DURATIONS,
     NEXT_VIDEO_POPUP_DURATIONS,
+    INTERFACE_SCALES,
     CATALOG_PREVIEW_SIZE,
     CATALOG_PAGE_SIZE,
     NONE_EXTRA_VALUE,
     SKIP_EXTRA_NAME,
-    META_LINK_CATEGORY,
     IMDB_LINK_CATEGORY,
     SHARE_LINK_CATEGORY,
     WRITERS_LINK_CATEGORY,
